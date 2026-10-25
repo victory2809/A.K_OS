@@ -2,117 +2,100 @@ name: Build Discipline APK
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - ".github/workflows/build.yml"
-      - "Discipline_AK_OS_Source.zip"
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: Build Android APK
     runs-on: ubuntu-22.04
 
     steps:
-      # 1. Download repository files
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Configure Java
-      - name: Set up Java 17
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      # 3. Configure Gradle
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
 
-      # 4. Configure Android SDK without the obsolete setup action
       - name: Configure Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: "latest"
-
-      # 5. Accept licences and install required SDK packages
-      - name: Install Android SDK packages
         shell: bash
         run: |
-          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
 
-          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
 
-          if [ ! -x "$SDKMANAGER" ]; then
-            SDKMANAGER="$(find "${ANDROID_HOME}/cmdline-tools" \
-              -type f -name sdkmanager | head -n 1)"
-          fi
+          echo "Android SDK: $SDK"
 
-          if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
-            echo "ERROR: Android SDK sdkmanager was not found."
+          if [ ! -d "$SDK" ]; then
+            echo "ERROR: Android SDK directory not found."
             exit 1
           fi
 
-          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+      - name: Find SDK Manager
+        shell: bash
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
 
+          SDKMANAGER="$(find "$SDK/cmdline-tools" \
+            -type f -name sdkmanager 2>/dev/null | head -n 1)"
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: SDK Manager not found."
+            exit 1
+          fi
+
+          echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
+
+      - name: Accept Android SDK licenses
+        shell: bash
+        run: |
+          yes | "$SDKMANAGER" --licenses || true
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
           "$SDKMANAGER" \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      # 6. Check and extract application source
       - name: Extract app source ZIP
         shell: bash
         run: |
-          set -euo pipefail
+          set -e
 
-          if [ ! -f "Discipline_AK_OS_Source.zip" ]; then
-            echo "ERROR: Discipline_AK_OS_Source.zip is missing."
-            echo "Upload the source ZIP to the repository root."
-            exit 1
-          fi
+          test -f Discipline_AK_OS_Source.zip
 
           mkdir -p unpacked
+
           unzip -q Discipline_AK_OS_Source.zip -d unpacked
 
-          if [ ! -f "unpacked/discipline_app/android/app/build.gradle" ]; then
-            echo "ERROR: Expected Android Gradle build file not found."
-            echo "Check the folder structure inside the source ZIP."
-            find unpacked -maxdepth 5 -type f | head -n 100
-            exit 1
-          fi
+          test -f unpacked/discipline_app/android/app/build.gradle
 
-      # 7. Build the debug APK
-      - name: Build Discipline APK
+      - name: Build APK
         working-directory: unpacked/discipline_app/android
-        shell: bash
-        run: |
-          set -euo pipefail
+        run: gradle --no-daemon --stacktrace assembleDebug
 
-          gradle --no-daemon --stacktrace assembleDebug
-
-      # 8. Verify APK exists
       - name: Verify APK
         shell: bash
         run: |
-          set -euo pipefail
-
           APK="unpacked/discipline_app/android/app/build/outputs/apk/debug/app-debug.apk"
 
-          if [ ! -f "$APK" ]; then
-            echo "ERROR: APK was not generated."
-            exit 1
-          fi
+          test -f "$APK"
 
           echo "APK generated successfully."
           ls -lh "$APK"
 
-      # 9. Make APK downloadable
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Discipline-debug-APK
