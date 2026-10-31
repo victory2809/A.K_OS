@@ -101,7 +101,7 @@ public class AlarmSoundService extends Service {
     private void startLoopingAlarmSound() {
         releasePlayer();
         try {
-            Uri alarm = Settings.System.getDefaultUri(Settings.System.TYPE_ALARM);
+            Uri alarm = Settings.System.DEFAULT_ALARM_ALERT_URI;
             if (alarm == null) alarm = Settings.System.DEFAULT_NOTIFICATION_URI;
             player = new MediaPlayer();
             player.setAudioAttributes(new AudioAttributes.Builder()
