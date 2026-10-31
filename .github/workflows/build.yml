@@ -7,6 +7,7 @@ on:
     paths:
       - 'Discipline_AK_OS_Source.zip'
       - 'ak-refresh.css'
+      - 'apply_alarm_fix.py'
       - '.github/workflows/build.yml'
 
 permissions:
@@ -86,6 +87,9 @@ jobs:
           cp "$ASSETS/index.html" unpacked/discipline_app/index.html
           echo "UI stylesheet applied:"
           wc -c "$ASSETS/ak-refresh.css"
+
+      - name: Apply continuous alarm sound fix
+        run: python3 apply_alarm_fix.py
 
       - name: Build APK
         working-directory: unpacked/discipline_app/android
