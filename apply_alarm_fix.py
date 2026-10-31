@@ -156,4 +156,8 @@ public class AlarmSoundService extends Service {
 }
 '''
 (root / "java/com/ak/discipline/AlarmSoundService.java").write_text(service)
-print("Applied continuous alarm service patch")
+from pathlib import Path
+p=Path("unpacked/discipline_app/android/app/build.gradle")
+s=p.read_text().replace("versionCode 3", "versionCode 4").replace("versionName '1.3.0'", "versionName '1.4.1'")
+p.write_text(s)
+print("Applied continuous alarm service patch and set version 1.4.1")
